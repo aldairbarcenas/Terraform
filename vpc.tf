@@ -176,7 +176,7 @@ resource "aws_instance" "ec2_public_2" {
   subnet_id               = aws_subnet.public_subnet_2.id
   key_name                = "cloud2"
   vpc_security_group_ids  = [aws_security_group.instance_sg.id]
-  user_data               = file("comando.sh")
+  user_data               = file("comando2.sh")
 
   tags = {
     Name = "EC2_Public_2"
