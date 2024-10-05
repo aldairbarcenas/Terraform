@@ -7,30 +7,31 @@ resource "aws_vpc" "cloud2_vpc" {
   }
 }
 
-# Public Subnet
+# Public Subnet 1
 resource "aws_subnet" "public_subnet_1" {
   vpc_id            = aws_vpc.cloud2_vpc.id
   cidr_block        = "30.0.1.0/24"
   availability_zone = "us-east-1a"
-  map_public_ip_on_launch = true # Ensures instances get public IPs
+  map_public_ip_on_launch = true
 
   tags = {
     Name = "PublicSubnet_1"
   }
 }
 
-# Public Subnet
+# Public Subnet 2
 resource "aws_subnet" "public_subnet_2" {
   vpc_id            = aws_vpc.cloud2_vpc.id
   cidr_block        = "30.0.2.0/24"
   availability_zone = "us-east-1b"
-  map_public_ip_on_launch = true # Ensures instances get public IPs
+  map_public_ip_on_launch = true
+
   tags = {
     Name = "PublicSubnet_2"
   }
 }
 
-# Private Subnet
+# Private Subnet 1
 resource "aws_subnet" "private_subnet_1" {
   vpc_id            = aws_vpc.cloud2_vpc.id
   cidr_block        = "30.0.3.0/24"
@@ -41,7 +42,7 @@ resource "aws_subnet" "private_subnet_1" {
   }
 }
 
-# Private Subnet
+# Private Subnet 2
 resource "aws_subnet" "private_subnet_2" {
   vpc_id            = aws_vpc.cloud2_vpc.id
   cidr_block        = "30.0.4.0/24"
@@ -81,7 +82,6 @@ resource "aws_route_table_association" "public_subnet_assoc_1_cloud2" {
   route_table_id = aws_route_table.public_route_table_cloud2.id
 }
 
-# Associate Public Subnet 2 with Public Route Table
 resource "aws_route_table_association" "public_subnet_assoc_2_cloud2" {
   subnet_id      = aws_subnet.public_subnet_2.id
   route_table_id = aws_route_table.public_route_table_cloud2.id
@@ -95,7 +95,7 @@ resource "aws_eip" "nat_eip" {
 resource "aws_nat_gateway" "nat_gw" {
   allocation_id = aws_eip.nat_eip.id
   subnet_id     = aws_subnet.public_subnet_1.id
-  
+
   tags = {
     Name = "NATGateway_Cloud2"
   }
@@ -115,40 +115,39 @@ resource "aws_route_table" "private_route_table_cloud2" {
   }
 }
 
-# Associate Private Subnet 1 with Private Route Table
+# Associate Private Subnet with Private Route Table
 resource "aws_route_table_association" "private_subnet_assoc_1_cloud2" {
   subnet_id      = aws_subnet.private_subnet_1.id
   route_table_id = aws_route_table.private_route_table_cloud2.id
 }
 
-# Associate Private Subnet 2 with Private Route Table
 resource "aws_route_table_association" "private_subnet_assoc_2_cloud2" {
   subnet_id      = aws_subnet.private_subnet_2.id
   route_table_id = aws_route_table.private_route_table_cloud2.id
 }
 
-# Security Group (Allow all outgoing traffic for instances)
+# Security Group (Allow all outgoing traffic and specific incoming traffic)
 resource "aws_security_group" "instance_sg" {
   vpc_id = aws_vpc.cloud2_vpc.id
 
-  ingress{
+  ingress {
     from_port   = 22
     to_port     = 22
-    protocol    = "tcp" # Allows all outbound traffic
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    
   }
-   ingress{
+
+  ingress {
     from_port   = 80
     to_port     = 80
-    protocol    = "tcp" # Allows all outbound traffic
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    
   }
+
   egress {
     from_port   = 0
     to_port     = 0
-    protocol    = "-1" # Allows all outbound traffic
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
@@ -157,17 +156,18 @@ resource "aws_security_group" "instance_sg" {
   }
 }
 
-
+# EC2 Instances with user_data to install Docker and run Nginx
 resource "aws_instance" "ec2_public_1" {
   ami                     = "ami-0fff1b9a61dec8a5f"
   instance_type           = "t2.micro"
   subnet_id               = aws_subnet.public_subnet_1.id
   key_name                = "cloud2"
   vpc_security_group_ids  = [aws_security_group.instance_sg.id]
+  user_data               = file("comando.sh")
 
-    tags = {
-      Name = "EC2_Public_1"
-    }
+  tags = {
+    Name = "EC2_Public_1"
+  }
 }
 
 resource "aws_instance" "ec2_public_2" {
@@ -176,10 +176,11 @@ resource "aws_instance" "ec2_public_2" {
   subnet_id               = aws_subnet.public_subnet_2.id
   key_name                = "cloud2"
   vpc_security_group_ids  = [aws_security_group.instance_sg.id]
+  user_data               = file("comando.sh")
 
-    tags = {
-      Name = "EC2_Public_2"
-    }
+  tags = {
+    Name = "EC2_Public_2"
+  }
 }
 
 # Outputs
@@ -203,10 +204,10 @@ output "private_subnet_2_id" {
   value = aws_subnet.private_subnet_2.id
 }
 
-output "ec2_public_ip_1"{
+output "ec2_public_ip_1" {
   value = aws_instance.ec2_public_1.public_ip
 }
 
-output "ec2_public_ip_2"{
+output "ec2_public_ip_2" {
   value = aws_instance.ec2_public_2.public_ip
 }
