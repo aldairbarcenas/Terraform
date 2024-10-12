@@ -1,6 +1,8 @@
 # VPC
 resource "aws_vpc" "cloud2_vpc" {
   cidr_block = "30.0.0.0/16"
+  enable_dns_support   = true   # Habilitar DNS resolution
+  enable_dns_hostnames = true   # Habilitar DNS hostnames
 
   tags = {
     Name = "cloud2_vpc"
@@ -210,4 +212,101 @@ output "ec2_public_ip_1" {
 
 output "ec2_public_ip_2" {
   value = aws_instance.ec2_public_2.public_ip
+}
+
+# Load Balancer
+resource "aws_lb" "my_load_balancer" {
+  name               = "EjercicioBalanceador"
+  internal           = false
+  load_balancer_type = "application"
+
+  security_groups = [aws_security_group.instance_sg.id]
+  subnets = [
+    aws_subnet.public_subnet_1.id,
+    aws_subnet.public_subnet_2.id,
+  ]
+
+  enable_deletion_protection = false
+
+  tags = {
+    Name = "MyLoadBalancer"
+  }
+}
+
+# Target Group
+resource "aws_lb_target_group" "my_target_group" {
+  name     = "my-target-group"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.cloud2_vpc.id
+
+  health_check {
+    path                = "/"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = {
+    Name = "MyTargetGroup"
+  }
+}
+
+# Target Group Attachments
+resource "aws_lb_target_group_attachment" "ec2_attachment_1" {
+  target_group_arn = aws_lb_target_group.my_target_group.arn
+  target_id        = aws_instance.ec2_public_1.id
+  port             = 80
+}
+
+resource "aws_lb_target_group_attachment" "ec2_attachment_2" {
+  target_group_arn = aws_lb_target_group.my_target_group.arn
+  target_id        = aws_instance.ec2_public_2.id
+  port             = 80
+}
+
+# Listener for the Load Balancer
+resource "aws_lb_listener" "http_listener" {
+  load_balancer_arn = aws_lb.my_load_balancer.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.my_target_group.arn
+  }
+}
+
+# RDS Subnet Group
+resource "aws_db_subnet_group" "rdspostgres" {
+  name       = "my-rds-subnet-group"
+  subnet_ids = [
+    aws_subnet.private_subnet_1.id,
+    aws_subnet.private_subnet_2.id,
+  ]
+
+  tags = {
+    Name = "MyRDSSubnetGroup"
+  }
+}
+
+# RDS Instance
+resource "aws_db_instance" "example" {
+  allocated_storage    = 20
+  storage_type        = "gp2"
+  engine              = "postgres"
+  engine_version      = "15.4"
+  instance_class      = "db.t3.micro"
+  db_name             = "mydb"                      # Cambiado de 'name' a 'db_name'
+  username            = "postgres"
+  password            = "mysecretpassword"
+  db_subnet_group_name = aws_db_subnet_group.rdspostgres.name
+  vpc_security_group_ids = [aws_security_group.instance_sg.id]
+  skip_final_snapshot  = true
+  publicly_accessible  = false
+
+  tags = {
+    Name = "MyRDSInstance"
+  }
 }
